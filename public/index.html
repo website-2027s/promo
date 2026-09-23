@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Coffee Shop</title>
+<meta name="theme-color" content="#130C18">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23D9B76E' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'><path d='M17 8h1a4 4 0 010 8h-1M3 8h14v9a4 4 0 01-4 4H7a4 4 0 01-4-4V8zM6 2v2M10 2v2M14 2v2'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant:wght@500;600;700&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+
+<!-- MOVING WORDS HEADER -->
+<header class="marquee-head" id="marqHead">
+  <h1 class="sr-only" id="srTitle">Coffee Shop</h1>
+  <div class="marquee" id="marquee" aria-hidden="true"></div>
+  <button class="marq-toggle" id="marqToggle" aria-label="Pause moving header" aria-pressed="false">
+    <svg class="icon" id="marqIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5v14M15 5v14"/></svg>
+  </button>
+</header>
+
+<main class="wrap" id="main" aria-busy="true">
+  <p class="tagline" id="tagline"></p>
+
+  <!-- QR -->
+  <section aria-labelledby="qrTitle" id="pay">
+    <div class="pay-card">
+      <h2 class="section-title" id="qrTitle" style="margin-bottom:8px">Scan to Pay</h2>
+      <div class="qr-frame"><img id="qrImg" alt="Payment QR code" width="600" height="600"></div>
+      <p class="hint" id="qrHint"></p>
+      <div class="actions">
+        <a class="btn btn-primary hidden" id="qrBtn" target="_blank" rel="noopener">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+          <span id="qrBtnLabel">Send receipt here</span>
+        </a>
+        <button class="btn btn-ghost" id="saveQr">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+          Save QR to Photos
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- MENU -->
+  <section aria-label="Menu">
+    <div class="menu-one" id="menu"></div>
+  </section>
+
+  <footer class="foot" id="footer"></footer>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+  const BEAN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="12" rx="6.5" ry="9" transform="rotate(35 12 12)"/><path d="M8.5 5.5c3 3 .5 6 3.5 6.5s1 4.5 3.5 6.5"/></svg>';
+  const ICON = {
+    pause: '<path d="M9 5v14M15 5v14"/>', play: '<path d="M7 5l12 7-12 7V5z"/>'
+  };
+  let D = null;
+
+  function toast(msg, err) { const t = $('toast'); t.textContent = msg; t.classList.toggle('err', !!err); t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2400); }
+
+  /* ---------- Marquee ---------- */
+  function renderMarquee(text) {
+    const words = String(text || '').split(',').map(w => w.trim()).filter(Boolean);
+    if (!words.length) words.push(D.settings.siteTitle || 'Coffee Shop');
+    const box = $('marquee'); box.innerHTML = '';
+    // Repeat so one set is wider than the screen, then duplicate for a seamless loop
+    const reps = Math.max(2, Math.ceil(8 / words.length));
+    for (let s = 0; s < 2; s++) {
+      const set = el('div', 'marquee-set');
+      for (let r = 0; r < reps; r++) words.forEach(w => { const n = el('span', 'marquee-word', w); n.insertAdjacentHTML('beforeend', BEAN); set.append(n); });
+      box.append(set);
+    }
+    const chars = words.join('').length * reps;
+    box.style.setProperty('--marq-dur', Math.max(18, chars * 0.55) + 's');
+  }
+  $('marqToggle').onclick = () => {
+    const paused = $('marqHead').classList.toggle('paused');
+    $('marqToggle').setAttribute('aria-pressed', String(paused));
+    $('marqToggle').setAttribute('aria-label', paused ? 'Play moving header' : 'Pause moving header');
+    $('marqIcon').innerHTML = paused ? ICON.play : ICON.pause;
+  };
+
+  /* ---------- Menu ---------- */
+  function renderMenu() {
+    const box = $('menu'); box.innerHTML = '';
+    const secs = D.menu.slice(0, 1);
+    if (!secs.length) { box.append(el('p', 'empty', 'Menu coming soon.')); return; }
+    secs.forEach(sec => {
+      const card = el('article', 'menu-card');
+      const h = el('h2', null, sec.title || 'Our Menu'); card.append(h);
+      const ul = el('ul', 'menu-list');
+      sec.items.forEach(it => {
+        const li = el('li');
+        const row = el('div', 'mi-row');
+        const dots = el('span', 'mi-dots'); dots.setAttribute('aria-hidden', 'true');
+        row.append(el('span', 'mi-name', it.name), dots, el('span', 'mi-price', it.price));
+        li.append(row);
+        if (it.desc) li.append(el('p', 'mi-desc', it.desc));
+        ul.append(li);
+      });
+      if (!sec.items.length) ul.append(el('li', 'mi-desc', 'Coming soon'));
+      card.append(ul); box.append(card);
+    });
+  }
+
+  function render() {
+    const s = D.settings;
+    document.title = s.siteTitle; $('srTitle').textContent = s.siteTitle;
+    renderMarquee(s.marquee);
+    $('tagline').textContent = s.tagline; $('tagline').classList.toggle('hidden', !s.tagline);
+    renderMenu();
+    $('qrTitle').textContent = s.qrTitle || 'Scan to Pay';
+    $('qrImg').src = s.qrUrl; $('qrHint').textContent = s.qrHint;
+    $('qrBtn').classList.toggle('hidden', !s.qrBtnUrl);
+    if (s.qrBtnUrl) { $('qrBtn').href = s.qrBtnUrl; $('qrBtnLabel').textContent = s.qrBtnLabel || 'Open link'; }
+    $('footer').textContent = s.footer;
+  }
+
+  $('saveQr').onclick = async () => {
+    try {
+      const res = await fetch(D.settings.qrUrl); const blob = await res.blob();
+      const ext = (blob.type.split('/')[1] || 'png').replace('jpeg', 'jpg');
+      const file = new File([blob], 'Payment-QR.' + ext, { type: blob.type });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'Payment QR' }); return; }
+      const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = file.name;
+      document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); toast('QR saved');
+    } catch (err) { if (err && err.name === 'AbortError') return; toast('Long-press the QR to save it'); }
+  };
+
+  fetch('/api/site').then(r => r.json()).then(d => { D = d; render(); $('main').setAttribute('aria-busy', 'false'); })
+    .catch(() => toast('Could not load. Refresh the page.', true));
+})();
+</script>
+</body>
+</html>
